@@ -17,24 +17,26 @@ export const inject = ['slots']
 const API = '/api/dsh-host-router'
 
 const STYLES = `
-.hr-page{font-family:ui-monospace,monospace;font-size:12px;line-height:1.6;padding:14px 16px;max-width:820px}
-.hr-page h3{margin:0 0 4px;font-size:13px}
-.hr-ep{color:var(--theme-text-secondary,#999);margin:0 0 8px;font-size:11px}
-.hr-hint{color:var(--theme-text-tertiary,#777);font-size:11px;margin:0 0 12px}
-.hr-bar{display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
-.hr-btn{background:var(--theme-accent,#4a9eff);color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;white-space:nowrap}
+.hr-page{font-family:ui-monospace,monospace;font-size:13px;line-height:1.55;padding:10px 14px;max-width:900px}
+.hr-page h3{margin:0 0 4px;font-size:14px}
+.hr-ep{color:var(--theme-text-secondary,#999);margin:0 0 6px;font-size:12px}
+.hr-hint{color:var(--theme-text-tertiary,#777);font-size:12px;margin:0 0 10px}
+.hr-bar{display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.hr-btn{background:var(--theme-accent,#4a9eff);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;white-space:nowrap}
 .hr-btn.ghost{background:transparent;border:1px solid var(--theme-border,#444);color:var(--theme-text,#ccc)}
 .hr-btn:disabled{opacity:.45;cursor:not-allowed}
-.hr-msg{color:var(--theme-text-secondary,#999);font-size:11px;padding:6px 10px;border-radius:6px;background:var(--theme-input-bg,#111);border:1px solid var(--theme-border,#333);white-space:pre-wrap;max-height:140px;overflow:auto;margin:8px 0}
-.hr-page{max-width:1000px}
-.table-wrap{overflow-x:auto;margin-bottom:12px}
-table{border-collapse:collapse;min-width:720px}
-th,td{border-bottom:1px solid var(--theme-border,#333);padding:4px 6px;text-align:left;font-size:11px;white-space:nowrap}
-th{font-size:10px;color:var(--theme-text-secondary,#999);font-weight:600}
+.hr-msg{color:var(--theme-text-secondary,#999);font-size:12px;padding:5px 8px;border-radius:6px;background:var(--theme-input-bg,#111);border:1px solid var(--theme-border,#333);white-space:pre-wrap;max-height:90px;overflow:auto;margin:6px 0}
+.table-wrap{overflow:auto;max-height:55vh;margin-bottom:10px}
+table{border-collapse:separate;border-spacing:0;width:auto;table-layout:fixed}
+th,td{border-bottom:1px solid var(--theme-border,#333);padding:3px 6px;text-align:left;font-size:12px;white-space:nowrap}
+td{overflow:hidden;text-overflow:ellipsis}
+th{font-size:11px;color:var(--theme-text-secondary,#999);font-weight:600}
+thead th{position:sticky;top:0;background:var(--theme-bg,#1b1b1c);z-index:1}
 td.c,th.c{text-align:center}
-td.h{font-family:ui-monospace,monospace;max-width:220px;overflow:hidden;text-overflow:ellipsis}
-.st-ok{color:#2ecc71}.st-fail{color:#e74c3c}.st-warn{color:#f1c40f}.st-gray{color:#888}
-.empty{padding:14px;text-align:center;color:var(--theme-text-secondary,#888)}
+tr.stale-row{opacity:.5}
+.st-ok{color:#2ecc71}.st-fail{color:#e74c3c}.st-gray{color:#888}
+.empty{padding:12px;text-align:center;color:var(--theme-text-secondary,#888)}
+.hr-tip{position:fixed;z-index:1000;pointer-events:none;background:var(--theme-input-bg,#111);border:1px solid var(--theme-border,#444);color:var(--theme-text,#ccc);padding:4px 8px;border-radius:5px;font-size:12px;max-width:440px;white-space:normal;word-break:break-all;box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .h4{margin:14px 0 4px;font-size:12px;color:var(--theme-text-secondary,#aaa)}
 `
 
@@ -56,6 +58,11 @@ function HostRouterPage() {
   const [seen, setSeen] = React.useState<SeenHost[]>([])
   const [msg, setMsg] = React.useState('')
   const [busy, setBusy] = React.useState(false)
+  const [tip, setTip] = React.useState<{ x: number; y: number; text: string } | null>(null)
+
+  // 超长内容浮窗(fixed 定位,不被表格 overflow 裁剪;右缘 clamp 防出屏)。
+  const showTip = (ev: any, text: string) => setTip({ x: Math.min(ev.clientX + 12, window.innerWidth - 452), y: ev.clientY + 16, text })
+  const hideTip = () => setTip(null)
 
   // 只刷数据(seen/cfg),不重置草稿:轮询与手动刷新不覆盖用户编辑到一半的勾选(2026-08-29)。
   const refreshData = React.useCallback(async () => {
@@ -123,29 +130,37 @@ function HostRouterPage() {
       React.createElement('button', { className: 'hr-btn ghost', onClick: refreshData }, '刷新'),
     ),
     msg && React.createElement('div', { className: 'hr-msg' }, msg),
-    // 合一表:嗅探 + 白名单(没扫到也显示)
+    // 合一表:嗅探 + 白名单(没扫到也显示);精简 5 列,tip 浮窗展示超长内容
     React.createElement('table', null,
+      React.createElement('colgroup', null,
+        React.createElement('col', { style: { width: '200px' } }),
+        React.createElement('col', { style: { width: '44px' } }),
+        React.createElement('col', { style: { width: '64px' } }),
+        React.createElement('col', { style: { width: '68px' } }),
+        React.createElement('col', { style: { width: '56px' } }),
+        React.createElement('col', { style: { width: '76px' } }),
+        React.createElement('col', { style: { width: '44px' } }),
+      ),
       React.createElement('thead', null, React.createElement('tr', null,
-        th('hostname', false), th('走代理'), th('归属'), th('出处'), th('本次命中'), th('状态'), th('耗时'), th('标记'), th('测试'))),
+        th('hostname', false), th('代理'), th('归属'), th('本次命中'), th('状态'), th('耗时'), th('测'))),
       React.createElement('tbody', null,
         seen.length === 0
-          ? React.createElement('tr', null, React.createElement('td', { className: 'empty', colSpan: 9 }, '暂无数据,先用 dsh 一会儿或点「扫描配置」'))
+          ? React.createElement('tr', null, React.createElement('td', { className: 'empty', colSpan: 5 }, '暂无数据,先用 dsh 一会儿或点「扫描配置」'))
           : seen.map((h: any) => {
               const alive = h.alive !== false && (h.count ?? 0) > 0
-              return React.createElement('tr', { key: h.host },
-                React.createElement('td', { className: 'h' }, h.host),
+              return React.createElement('tr', { key: h.host, className: h.stale ? 'stale-row' : undefined },
+                React.createElement('td', { onMouseEnter: (e: any) => showTip(e, h.host), onMouseLeave: hideTip }, h.host),
                 React.createElement('td', { className: 'c' }, React.createElement('input', { type: 'checkbox', checked: draft.has(h.host), onChange: () => toggle(h.host) })),
-                React.createElement('td', { className: 'c' }, h.owner ?? '未知'),
-                React.createElement('td', { className: 'c' }, h.source ?? '-'),
+                React.createElement('td', { className: 'c', onMouseEnter: (e: any) => showTip(e, `${h.owner ?? '未知'} · ${h.source ?? '-'}`), onMouseLeave: hideTip }, h.owner ?? '未知'),
                 React.createElement('td', { className: 'c' }, React.createElement('span', { className: alive ? 'st-ok' : 'st-gray' }, alive ? `●${h.count}` : '○')),
-                React.createElement('td', { className: 'c' }, React.createElement('span', { className: h.lastStatus === 'ERR' ? 'st-fail' : 'st-ok' }, String(h.lastStatus ?? ''))),
-                React.createElement('td', { className: 'c' }, (h.lastMs ?? '') + (h.lastMs != null ? 'ms' : '')),
-                React.createElement('td', { className: 'c' }, h.stale ? React.createElement('span', { className: 'st-warn' }, '过期') : ''),
-                React.createElement('td', { className: 'c' }, React.createElement('button', { className: 'hr-btn ghost', onClick: () => doTest(h.host), style: { padding: '2px 8px' } }, '测')),
+                React.createElement('td', { className: 'c' }, React.createElement('span', { className: h.lastStatus === 'ERR' ? 'st-fail' : 'st-ok' }, String(h.lastStatus ?? '—'))),
+                React.createElement('td', { className: 'c' }, h.lastMs != null ? `${h.lastMs}ms` : ''),
+                React.createElement('td', { className: 'c' }, React.createElement('button', { className: 'hr-btn ghost', onClick: () => doTest(h.host), style: { padding: '0 6px' } }, '测')),
               )
             })
       ),
     ),
+    tip && React.createElement('div', { className: 'hr-tip', style: { left: tip.x, top: tip.y } }, tip.text),
   )
 }
 
