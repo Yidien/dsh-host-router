@@ -2,7 +2,7 @@
  * dsh-host-router · host 入口。
  *
  * 外挂式 host 路由:按 hostname 给 dsh 请求分流(勾选走代理,其余直连)+ 嗅探
- * + 设置页 API(/api/dsh-host-router/{seen,scan,clean-stale,save,test,config})。
+ * + 设置页 API(/api/dsh-host-router/{seen,scan,save,test,config})。
  *
  * 全程在 globalThis.fetch 层替换(白名单走 undici+ProxyAgent,其余原样直连),
  * 位于 LLM 适配器之下,不碰 settings.yaml
@@ -20,9 +20,6 @@ import { pathToFileURL } from 'node:url'
 
 let undiciMod: any = null
 let installed = false
-
-/** 7 天没嗅探到 = stale(清理过期用)。 */
-const STALE_MS = 7 * 24 * 3600 * 1000
 
 /** 解析 undici 绝对路径:插件目录可能无 node_modules,从 profile node_modules 找。
  *  优先 DSH_HOME/profiles/web/node_modules,退 homedir/.dsh/...
@@ -199,7 +196,6 @@ export function apply(ctx: any): void {
           try { fetchPatched = patched && (globalThis as any).fetch !== originalFetch } catch {}
           const cfg = readConfig()
           const proxied = new Set(cfg.proxiedHosts ?? [])
-          const now = Date.now()
           // 合并:嗅探到的 host + 白名单 host(没嗅探到也显示,灰)
           const map = new Map<string, any>()
           for (const h of seen.list()) map.set(h.host, { ...h })
@@ -208,8 +204,7 @@ export function apply(ctx: any): void {
           }
           const hosts = [...map.values()].map((h: any) => {
             const hits = h.count ?? 0
-            const stale = proxied.has(h.host) && (hits === 0 || (h.lastSeen ? now - h.lastSeen > STALE_MS : true))
-            return { ...h, proxied: proxied.has(h.host), hits, stale, alive: hits > 0 }
+            return { ...h, proxied: proxied.has(h.host), hits, alive: hits > 0 }
           })
           json(res, 200, { ok: true, hosts, installed, diag, fetchPatched }); return
         }
@@ -233,24 +228,6 @@ export function apply(ctx: any): void {
           for (const r of results) seen.upsert(r.host, { owner: r.owner, source: r.source, mode: 'active', lastStatus: r.direct, lastMs: r.ms })
           results.sort((a, b) => Number(b.needsProxy) - Number(a.needsProxy) || a.host.localeCompare(b.host))
           json(res, 200, { ok: true, hosts: results }); return
-        }
-        if (url.endsWith('/clean-stale') && req.method === 'POST') {
-          // 一键清灰:移除 stale(本次 run hits=0 或 7 天没动)的白名单 host
-          const cfg = readConfig()
-          const proxied = new Set(cfg.proxiedHosts ?? [])
-          const now = Date.now()
-          const seenList = new Map(seen.list().map((h: any) => [h.host, h]))
-          const removed: string[] = []
-          cfg.proxiedHosts = (cfg.proxiedHosts ?? []).filter((h: string) => {
-            const s = seenList.get(h)
-            const hits = s?.count ?? 0
-            const stale = hits === 0 || (s?.lastSeen ? now - s.lastSeen > STALE_MS : true)
-            if (stale) { removed.push(h); return false }
-            return true
-          })
-          writeConfig(cfg)
-          try { reloadFetch(undiciMod, cfg) } catch {}
-          json(res, 200, { ok: true, removed }); return
         }
         if (url.endsWith('/save') && req.method === 'POST') {
           const body = await readBody(req)

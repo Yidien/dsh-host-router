@@ -33,7 +33,6 @@ td{overflow:hidden;text-overflow:ellipsis}
 th{font-size:11px;color:var(--theme-text-secondary,#999);font-weight:600}
 thead th{position:sticky;top:0;background:var(--theme-bg,#1b1b1c);z-index:1}
 td.c,th.c{text-align:center}
-tr.stale-row{opacity:.5}
 .st-ok{color:#2ecc71}.st-fail{color:#e74c3c}.st-gray{color:#888}
 .empty{padding:12px;text-align:center;color:var(--theme-text-secondary,#888)}
 .hr-tip{position:fixed;z-index:1000;pointer-events:none;background:var(--theme-input-bg,#111);border:1px solid var(--theme-border,#444);color:var(--theme-text,#ccc);padding:4px 8px;border-radius:5px;font-size:12px;max-width:440px;white-space:normal;word-break:break-all;box-shadow:0 2px 8px rgba(0,0,0,.35)}
@@ -48,7 +47,7 @@ async function jpost(path: string, body?: any): Promise<any> {
 
 interface SeenHost {
   host: string; lastStatus?: number | string; lastMs?: number; count?: number
-  owner?: string; source?: string; proxied?: boolean; hits?: number; stale?: boolean; alive?: boolean
+  owner?: string; source?: string; proxied?: boolean; hits?: number; alive?: boolean
 }
 interface Cfg { proxyHost?: string; proxyPort?: number; proxiedHosts?: string[] }
 
@@ -70,7 +69,7 @@ function HostRouterPage() {
     if (cfgR?.ok) setCfg(cfgR.value)
     setSeen(seenR?.ok ? seenR.hosts : [])
   }, [])
-  // 全量刷新:数据 + 草稿同步磁盘白名单(首次加载/清理过期后用)。
+  // 全量刷新:数据 + 草稿同步磁盘白名单(首次加载用)。
   const refreshAll = React.useCallback(async () => {
     const [seenR, cfgR] = await Promise.all([jget('/seen'), jget('/config')])
     if (cfgR?.ok) { setCfg(cfgR.value); setDraft(new Set(cfgR.value.proxiedHosts ?? [])) }
@@ -110,23 +109,14 @@ function HostRouterPage() {
   const th = (txt: string, c = true) => React.createElement('th', { className: c ? 'c' : '', key: txt }, txt)
   const endpoint = `${cfg.proxyHost ?? '127.0.0.1'}:${cfg.proxyPort ?? 7897}`
 
-  const doCleanStale = async () => {
-    setBusy(true); setMsg('清理过期…')
-    const r = await jpost('/clean-stale')
-    setBusy(false)
-    setMsg(r?.ok ? `已清理 ${r.removed?.length ?? 0} 个过期 host:${(r.removed ?? []).join(', ') || '无'}` : '清理失败')
-    if (r?.ok) refreshAll()  // 磁盘白名单被清理,草稿需同步
-  }
-
   return React.createElement('div', { className: 'hr-page' },
     React.createElement('style', null, STYLES),
     React.createElement('h3', null, '网络路由(dsh-host-router)'),
     React.createElement('p', { className: 'hr-ep' }, '代理: ', React.createElement('code', null, endpoint)),
-    React.createElement('p', { className: 'hr-hint' }, '勾选走代理,保存即生效。绿=本次扫到在用,灰=本次没扫到(几次重启都灰可删),过期=白名单里但久未用。'),
+    React.createElement('p', { className: 'hr-hint' }, '勾选走代理,保存即生效。绿=本次进程实际用到过,灰=本次还没用到;取消勾选再保存即可移除。'),
     React.createElement('div', { className: 'hr-bar' },
       React.createElement('button', { className: 'hr-btn', onClick: doScan, disabled: busy }, '扫描配置'),
       React.createElement('button', { className: 'hr-btn ghost', onClick: doSave, disabled: busy }, '保存勾选'),
-      React.createElement('button', { className: 'hr-btn ghost', onClick: doCleanStale, disabled: busy }, '清理过期'),
       React.createElement('button', { className: 'hr-btn ghost', onClick: refreshData }, '刷新'),
     ),
     msg && React.createElement('div', { className: 'hr-msg' }, msg),
@@ -148,7 +138,7 @@ function HostRouterPage() {
           ? React.createElement('tr', null, React.createElement('td', { className: 'empty', colSpan: 5 }, '暂无数据,先用 dsh 一会儿或点「扫描配置」'))
           : seen.map((h: any) => {
               const alive = h.alive !== false && (h.count ?? 0) > 0
-              return React.createElement('tr', { key: h.host, className: h.stale ? 'stale-row' : undefined },
+              return React.createElement('tr', { key: h.host },
                 React.createElement('td', { onMouseEnter: (e: any) => showTip(e, h.host), onMouseLeave: hideTip }, h.host),
                 React.createElement('td', { className: 'c' }, React.createElement('input', { type: 'checkbox', checked: draft.has(h.host), onChange: () => toggle(h.host) })),
                 React.createElement('td', { className: 'c', onMouseEnter: (e: any) => showTip(e, `${h.owner ?? '未知'} · ${h.source ?? '-'}`), onMouseLeave: hideTip }, h.owner ?? '未知'),

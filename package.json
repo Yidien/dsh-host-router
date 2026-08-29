@@ -1,9 +1,9 @@
 {
   "name": "dsh-host-router",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "main": "lib/index.js",
-  "description": "dsh 外挂式网络路由:按 hostname 给 dsh 请求分流——勾选的域名走本地代理(Clash 等),其余直连。内置嗅探,自动扫描 dsh 访问过的 hostname,设置页勾选即生效(保存即热生效,免重启)。纯外挂:dependencies 空,运行时零 require,全靠宿主 ctx 注入;不碰 settings.yaml provider 配置。",
+  "description": "dsh 澶栨寕寮忕綉缁滆矾鐢?鎸?hostname 缁?dsh 璇锋眰鍒嗘祦鈥斺€斿嬀閫夌殑鍩熷悕璧版湰鍦颁唬鐞?Clash 绛?,鍏朵綑鐩磋繛銆傚唴缃梾鎺?鑷姩鎵弿 dsh 璁块棶杩囩殑 hostname,璁剧疆椤靛嬀閫夊嵆鐢熸晥(淇濆瓨鍗崇儹鐢熸晥,鍏嶉噸鍚?銆傜函澶栨寕:dependencies 绌?杩愯鏃堕浂 require,鍏ㄩ潬瀹夸富 ctx 娉ㄥ叆;涓嶇 settings.yaml provider 閰嶇疆銆?,
   "license": "MIT",
   "author": "",
   "engines": {
