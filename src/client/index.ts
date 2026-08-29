@@ -165,10 +165,12 @@ function HostRouterPage() {
 }
 
 export function apply(ctx: ClientContext): void {
-  ctx.effect(() => ctx.slots.inject('settings.section', () =>
+  // slots.inject 必须裸调用(不包 ctx.effect),否则注册时机错位——
+  // 切走设置页再切回时组件被重建、draft 状态丢失(对勾消失)。照 dsh-capture 写法。
+  ctx.slots.inject('settings.section', () =>
     ctx.slots.register(
       { name: 'settings.section', id: 'dsh-host-router', order: 60, label: '网络路由' },
       (props: any) => React.createElement(HostRouterPage, props),
     ),
-  ), 'dsh-host-router: settings page')
+  )
 }

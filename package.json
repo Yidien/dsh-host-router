@@ -1,6 +1,6 @@
 {
   "name": "dsh-host-router",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "main": "lib/index.js",
   "description": "dsh 外挂式网络路由:按 hostname 给 dsh 请求分流——勾选的域名走本地代理(Clash 等),其余直连。内置嗅探,自动扫描 dsh 访问过的 hostname,设置页勾选即生效(保存即热生效,免重启)。纯外挂:dependencies 空,运行时零 require,全靠宿主 ctx 注入;不碰 settings.yaml provider 配置。",
