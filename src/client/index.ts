@@ -67,13 +67,13 @@ function HostRouterPage() {
   // 只刷数据(seen/cfg),不重置草稿:轮询与手动刷新不覆盖用户编辑到一半的勾选(2026-08-29)。
   const refreshData = React.useCallback(async () => {
     const [seenR, cfgR] = await Promise.all([jget('/seen'), jget('/config')])
-    if (cfgR?.ok?.value) setCfg(cfgR.value)
+    if (cfgR?.ok) setCfg(cfgR.value)
     setSeen(seenR?.ok ? seenR.hosts : [])
   }, [])
   // 全量刷新:数据 + 草稿同步磁盘白名单(首次加载/清理过期后用)。
   const refreshAll = React.useCallback(async () => {
     const [seenR, cfgR] = await Promise.all([jget('/seen'), jget('/config')])
-    if (cfgR?.ok?.value) { setCfg(cfgR.value); setDraft(new Set(cfgR.value.proxiedHosts ?? [])) }
+    if (cfgR?.ok) { setCfg(cfgR.value); setDraft(new Set(cfgR.value.proxiedHosts ?? [])) }
     setSeen(seenR?.ok ? seenR.hosts : [])
   }, [])
 
