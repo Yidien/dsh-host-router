@@ -1,0 +1,19 @@
+# dependencies
+node_modules/
+
+# build outputs (build.mjs 会重新生成)
+lib/
+dist/
+
+# misc
+.npm-cache/
+*.log
+.DS_Store
+Thumbs.db
+
+# npm lock(本项目不装 devDeps,lock 是噪音)
+package-lock.json
+
+# editor
+.vscode/
+.idea/
