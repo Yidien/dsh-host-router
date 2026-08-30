@@ -200,7 +200,7 @@ export function apply(ctx: any): void {
           const map = new Map<string, any>()
           for (const h of seen.list()) map.set(h.host, { ...h })
           for (const h of proxied) {
-            if (!map.has(h)) map.set(h, { host: h, count: 0, owner: '未知', source: 'config', mode: 'passive' })
+            if (!map.has(h)) map.set(h, { host: h, count: 0, owner: '未知', source: 'config' })
           }
           const hosts = [...map.values()].map((h: any) => {
             const hits = h.count ?? 0
@@ -225,7 +225,7 @@ export function apply(ctx: any): void {
           async function worker() { while (idx < candidates.length) { const c = candidates[idx++]; results.push(await probe(c)) } }
           await Promise.all(Array.from({ length: 8 }, worker))
           // upsert 进 store(带探测结果,不增 hits)
-          for (const r of results) seen.upsert(r.host, { owner: r.owner, source: r.source, mode: 'active', lastStatus: r.direct, lastMs: r.ms })
+          for (const r of results) seen.upsert(r.host, { owner: r.owner, source: r.source, lastStatus: r.direct, lastMs: r.ms })
           results.sort((a, b) => Number(b.needsProxy) - Number(a.needsProxy) || a.host.localeCompare(b.host))
           json(res, 200, { ok: true, hosts: results }); return
         }

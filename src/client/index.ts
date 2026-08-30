@@ -33,6 +33,7 @@ td{overflow:hidden;text-overflow:ellipsis}
 th{font-size:11px;color:var(--theme-text-secondary,#999);font-weight:600}
 thead th{position:sticky;top:0;background:var(--theme-bg,#1b1b1c);z-index:1}
 td.c,th.c{text-align:center}
+tr.dim-row{opacity:.55}
 .st-ok{color:#2ecc71}.st-fail{color:#e74c3c}.st-gray{color:#888}
 .empty{padding:12px;text-align:center;color:var(--theme-text-secondary,#888)}
 .hr-tip{position:fixed;z-index:1000;pointer-events:none;background:var(--theme-input-bg,#111);border:1px solid var(--theme-border,#444);color:var(--theme-text,#ccc);padding:4px 8px;border-radius:5px;font-size:12px;max-width:440px;white-space:normal;word-break:break-all;box-shadow:0 2px 8px rgba(0,0,0,.35)}
@@ -138,7 +139,7 @@ function HostRouterPage() {
           ? React.createElement('tr', null, React.createElement('td', { className: 'empty', colSpan: 5 }, '暂无数据,先用 dsh 一会儿或点「扫描配置」'))
           : seen.map((h: any) => {
               const alive = h.alive !== false && (h.count ?? 0) > 0
-              return React.createElement('tr', { key: h.host },
+              return React.createElement('tr', { key: h.host, className: alive ? undefined : 'dim-row' },
                 React.createElement('td', { onMouseEnter: (e: any) => showTip(e, h.host), onMouseLeave: hideTip }, h.host),
                 React.createElement('td', { className: 'c' }, React.createElement('input', { type: 'checkbox', checked: draft.has(h.host), onChange: () => toggle(h.host) })),
                 React.createElement('td', { className: 'c', onMouseEnter: (e: any) => showTip(e, `${h.owner ?? '未知'} · ${h.source ?? '-'}`), onMouseLeave: hideTip }, h.owner ?? '未知'),

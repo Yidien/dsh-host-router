@@ -1,9 +1,9 @@
 /**
  * dsh-host-router · 嗅探聚合 + 主动扫描候选。
  *
- * seenStore:按 host 聚合(首次/最近/命中数/状态/owner/source),给设置页清单。
- *   count = 本次进程(run)命中数,>0 绿(本次扫到)、=0 灰(本次没扫到)。
- *   dsh 重启 = 新进程 = count 清零,看几次重启都灰 = 可删。
+ * seenStore:按 host 聚合(最近/命中数/状态/owner/source),给设置页清单。
+ *   count = 本次进程(run)命中数,>0 绿(本次用到)、=0 灰+整行半透明(本次没用到)。
+ *   dsh 重启 = 新进程 = count 清零(设计内,重启后重新累计)。
  * scanCandidates:读 ~/.dsh/settings.yaml provider baseURL host + 已知境外兜底,
  *   每个带 owner(粗归属)+ source(settings/known),给主动扫描不靠猜的候选表。
  */
@@ -15,7 +15,6 @@ import { logPath } from './config.js'
 
 export interface SeenHost {
   host: string
-  firstSeen?: number
   lastSeen?: number
   count?: number          // 本次 run 命中数(绿/灰判定)
   lastStatus?: number | string
@@ -24,7 +23,6 @@ export interface SeenHost {
   error?: string
   owner?: string          // 粗归属(openai/dshmarket/截图/provider 名/未知)
   source?: 'sniff' | 'settings' | 'known'  // 出处
-  mode?: 'passive' | 'active'
 }
 
 /** owner 映射:已知 host → 归属(粗标)。 */
@@ -56,7 +54,7 @@ export function makeSeenStore() {
       e.lastSeen = r.ts; e.count = (e.count ?? 1) + 1; e.lastStatus = r.status; e.lastMs = r.ms; e.proxy = r.proxy
       if (r.error) e.error = r.error
     } else {
-      byHost.set(r.host, { host: r.host, firstSeen: r.ts, lastSeen: r.ts, count: 1, lastStatus: r.status, lastMs: r.ms, proxy: r.proxy, error: r.error, owner: ownerOf(r.host), source: 'sniff', mode: 'passive' })
+      byHost.set(r.host, { host: r.host, lastSeen: r.ts, count: 1, lastStatus: r.status, lastMs: r.ms, proxy: r.proxy, error: r.error, owner: ownerOf(r.host), source: 'sniff' })
     }
     try { appendFileSync(logPath(), `${r.ts} | ${r.proxy ? 'PROXY ' : 'DIRECT'} | ${r.host}${r.path} | ${r.status} | ${r.ms}ms\n`) } catch { /* ignore */ }
   }
@@ -97,9 +95,9 @@ function providersFromSettings(): string[] {
 /** 扫描候选 = settings.yaml provider host + 已知境外兜底,带 owner/source。 */
 export function scanCandidates(): SeenHost[] {
   const byHost = new Map<string, SeenHost>()
-  for (const h of providersFromSettings()) byHost.set(h, { host: h, count: 0, owner: ownerOf(h), source: 'settings', mode: 'active' })
+  for (const h of providersFromSettings()) byHost.set(h, { host: h, count: 0, owner: ownerOf(h), source: 'settings' })
   for (const h of KNOWN_REMOTE) {
-    if (!byHost.has(h)) byHost.set(h, { host: h, count: 0, owner: OWNER_MAP[h] ?? '未知', source: 'known', mode: 'active' })
+    if (!byHost.has(h)) byHost.set(h, { host: h, count: 0, owner: OWNER_MAP[h] ?? '未知', source: 'known' })
   }
   return [...byHost.values()].filter((s) => !isLoopback(s.host))
 }
