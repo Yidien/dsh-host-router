@@ -64,6 +64,16 @@ function HostRouterPage() {
   const [tip, setTip] = React.useState<{ x: number; y: number; text: string } | null>(null)
   const [proxyHost, setProxyHost] = React.useState('127.0.0.1')
   const [proxyPort, setProxyPort] = React.useState('7897')
+  // 勾选即时保存:draftRef 是权威源 + 250ms 防抖合并连续勾选
+  const draftRef = React.useRef(new Set<string>())
+  const saveTimer = React.useRef<number | null>(null)
+  const scheduleSave = React.useCallback(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = window.setTimeout(async () => {
+      const r = await jpost('/save', { proxiedHosts: [...draftRef.current] })
+      setMsg(r?.ok ? '已保存并即时生效' : '保存失败')
+    }, 250)
+  }, [])
 
   // 超长内容浮窗(fixed 定位,不被表格 overflow 裁剪;右缘 clamp 防出屏)。
   const showTip = (ev: any, text: string) => setTip({ x: Math.min(ev.clientX + 12, window.innerWidth - 452), y: ev.clientY + 16, text })
@@ -78,7 +88,9 @@ function HostRouterPage() {
   const refreshAll = React.useCallback(async () => {
     const [seenR, cfgR] = await Promise.all([jget('/seen'), jget('/config')])
     if (cfgR?.ok) {
-      setDraft(new Set(cfgR.value.proxiedHosts ?? []))
+      const hosts = new Set(cfgR.value.proxiedHosts ?? [])
+      draftRef.current = hosts
+      setDraft(hosts)
       setProxyHost(cfgR.value.proxyHost ?? '127.0.0.1')
       setProxyPort(String(cfgR.value.proxyPort ?? 7897))
     }
@@ -88,10 +100,24 @@ function HostRouterPage() {
   React.useEffect(() => {
     refreshAll()
     const t = window.setInterval(refreshData, 5000)
-    return () => window.clearInterval(t)
-  }, [refreshAll, refreshData])
+    return () => {
+      window.clearInterval(t)
+      // 切页/卸载时 flush 未落盘的勾选改动,避免防抖保存被丢弃(2026-08-29)
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current)
+        jpost('/save', { proxiedHosts: [...draftRef.current] }).catch(() => {})
+      }
+    }
+  }, [refreshAll, refreshData, scheduleSave])
 
-  const toggle = (h: string) => setDraft((d) => { const n = new Set(d); n.has(h) ? n.delete(h) : n.add(h); return n })
+  // 勾选即保存:勾上 = 加入白名单并保存,取消 = 移除并保存
+  const toggle = (h: string) => {
+    const n = new Set(draftRef.current)
+    n.has(h) ? n.delete(h) : n.add(h)
+    draftRef.current = n
+    setDraft(n)
+    scheduleSave()
+  }
 
   const doScan = async () => {
     setMsg('扫描中…'); setBusy(true)
@@ -102,15 +128,16 @@ function HostRouterPage() {
     await refreshData()  // 扫描结果已 upsert 进 seen,刷新拉合并表(不动草稿)
   }
 
-  const doSave = async () => {
-    setBusy(true); setMsg('保存中…')
+  // 独立保存代理地址/端口(不动白名单;/save 只改传了的字段)
+  const doSaveProxy = async () => {
+    setBusy(true)
     const port = Number(proxyPort)
     if (!Number.isFinite(port) || port < 1 || port > 65535) {
       setBusy(false); setMsg('端口无效(1-65535)'); return
     }
-    const r = await jpost('/save', { proxiedHosts: [...draft], proxyHost: proxyHost.trim(), proxyPort: port })
+    const r = await jpost('/save', { proxyHost: proxyHost.trim(), proxyPort: port })
     setBusy(false)
-    setMsg(r?.ok ? '已保存并即时生效' : '保存失败')
+    setMsg(r?.ok ? '代理地址已保存并即时生效' : '保存失败')
     if (r?.ok) refreshData()
   }
 
@@ -129,12 +156,11 @@ function HostRouterPage() {
       React.createElement('input', { className: 'hr-inp', value: proxyHost, onChange: (e: any) => setProxyHost(e.target.value), placeholder: '127.0.0.1' }),
       React.createElement('span', { className: 'hr-lbl' }, '端口'),
       React.createElement('input', { className: 'hr-inp hr-inp-port', value: proxyPort, onChange: (e: any) => setProxyPort(e.target.value.replace(/\D/g, '').slice(0, 5)), placeholder: '7897' }),
-      React.createElement('span', { className: 'hr-hint2' }, '保存勾选时一并保存'),
+      React.createElement('button', { className: 'hr-btn ghost', onClick: doSaveProxy, disabled: busy }, '保存代理'),
     ),
-    React.createElement('p', { className: 'hr-hint' }, '勾选走代理,保存即生效。绿=本次进程实际用到过,灰=本次还没用到;取消勾选再保存即可移除。'),
+    React.createElement('p', { className: 'hr-hint' }, '勾选即保存(加入白名单)、取消勾选即移除,无需再点保存。绿=本次进程实际用到过,灰=本次还没用到。'),
     React.createElement('div', { className: 'hr-bar' },
       React.createElement('button', { className: 'hr-btn', onClick: doScan, disabled: busy }, '扫描配置'),
-      React.createElement('button', { className: 'hr-btn ghost', onClick: doSave, disabled: busy }, '保存勾选'),
       React.createElement('button', { className: 'hr-btn ghost', onClick: refreshData }, '刷新'),
     ),
     msg && React.createElement('div', { className: 'hr-msg' }, msg),
