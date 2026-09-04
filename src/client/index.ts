@@ -32,13 +32,13 @@ const STYLES = `
 .hr-btn:disabled{opacity:.45;cursor:not-allowed}
 .hr-msg{color:var(--theme-text-secondary,#999);font-size:12px;padding:5px 8px;border-radius:6px;background:var(--theme-input-bg,#111);border:1px solid var(--theme-border,#333);white-space:pre-wrap;max-height:90px;overflow:auto;margin:6px 0}
 .table-wrap{overflow:auto;max-height:55vh;margin-bottom:10px}
-table{border-collapse:separate;border-spacing:0;width:auto;table-layout:fixed}
-th,td{border-bottom:1px solid var(--theme-border,#333);padding:3px 6px;text-align:left;font-size:12px;white-space:nowrap}
-td{overflow:hidden;text-overflow:ellipsis}
-th{font-size:11px;color:var(--theme-text-secondary,#999);font-weight:600}
-thead th{position:sticky;top:0;background:var(--theme-bg,#1b1b1c);z-index:1}
-td.c,th.c{text-align:center}
-tr.dim-row{opacity:.55}
+.hr-page table{border-collapse:separate;border-spacing:0;width:auto;table-layout:fixed}
+.hr-page th,.hr-page td{border-bottom:1px solid var(--theme-border,#333);padding:3px 6px;text-align:left;font-size:12px;white-space:nowrap}
+.hr-page td{overflow:hidden;text-overflow:ellipsis}
+.hr-page th{font-size:11px;color:var(--theme-text-secondary,#999);font-weight:600}
+.hr-page thead th{position:sticky;top:0;background:var(--theme-bg,#1b1b1c);z-index:1}
+.hr-page td.c,.hr-page th.c{text-align:center}
+.hr-page tr.dim-row{opacity:.55}
 .st-ok{color:#2ecc71}.st-fail{color:#e74c3c}.st-gray{color:#888}
 .empty{padding:12px;text-align:center;color:var(--theme-text-secondary,#888)}
 .hr-tip{position:fixed;z-index:1000;pointer-events:none;background:var(--theme-input-bg,#111);border:1px solid var(--theme-border,#444);color:var(--theme-text,#ccc);padding:4px 8px;border-radius:5px;font-size:12px;max-width:440px;white-space:normal;word-break:break-all;box-shadow:0 2px 8px rgba(0,0,0,.35)}
@@ -70,6 +70,7 @@ function HostRouterPage() {
   const scheduleSave = React.useCallback(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = window.setTimeout(async () => {
+      saveTimer.current = null
       const r = await jpost('/save', { proxiedHosts: [...draftRef.current] })
       setMsg(r?.ok ? '已保存并即时生效' : '保存失败')
     }, 250)
@@ -103,8 +104,9 @@ function HostRouterPage() {
     return () => {
       window.clearInterval(t)
       // 切页/卸载时 flush 未落盘的勾选改动,避免防抖保存被丢弃(2026-08-29)
-      if (saveTimer.current) {
+      if (saveTimer.current != null) {
         clearTimeout(saveTimer.current)
+        saveTimer.current = null
         jpost('/save', { proxiedHosts: [...draftRef.current] }).catch(() => {})
       }
     }
@@ -143,6 +145,7 @@ function HostRouterPage() {
 
   const doTest = async (h: string) => {
     const r = await jpost('/test', { host: h })
+    if (!r) { setMsg(`${h}: 测试请求失败`); return }
     setMsg(`${h}: ${r.status} · ${r.ms}ms · ${r.proxy ? '代理' : '直连'}` + (r.message ? ` · ${r.message}` : ''))
   }
 

@@ -149,6 +149,8 @@ async function testHost(host: string): Promise<any> {
 export const inject = ['webServer']
 
 export function apply(ctx: any): void {
+  // import(undici) 是异步的；卸载发生在它完成前时，禁止迟到回调重新 patch 全局 fetch。
+  let disposed = false
   let diag = 'apply-start'
   try { appendFileSync(logPath(), `# apply at ${new Date().toISOString()}\n`); diag = 'logged' } catch {}
   const start = (u: any) => {
@@ -175,6 +177,7 @@ export function apply(ctx: any): void {
   try { appendFileSync(logPath(), `# undiciMain=${undiciMain ?? '(null)'}\n`) } catch {}
   if (!undiciMain) { diag = 'undici-not-found'; ctx.logger?.error?.('dsh-host-router: undici not found in profile node_modules — disabled'); return }
   import(undiciMain).then(async (u: any) => {
+    if (disposed) return
     try { appendFileSync(logPath(), `# undici imported OK\n`) } catch {}
     start(u)
   }).catch((e) => {
@@ -256,6 +259,7 @@ export function apply(ctx: any): void {
     },
   }), 'dsh-host-router: api')
 
-  // cordis 4.0.2 不 emit 'dispose' 事件，清理必须走 effect disposer 才会在卸载时执行
-  ctx.effect(() => unpatchFetch, 'dsh-host-router: fetch cleanup')
+  // cordis 4.0.2 不 emit 'dispose' 事件，清理必须走 effect disposer 才会在卸载时执行。
+  // 同时阻止尚未完成的 undici import 在卸载后重新安装全局 patch。
+  ctx.effect(() => () => { disposed = true; unpatchFetch() }, 'dsh-host-router: fetch cleanup')
 }
