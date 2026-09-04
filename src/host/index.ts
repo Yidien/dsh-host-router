@@ -256,7 +256,6 @@ export function apply(ctx: any): void {
     },
   }), 'dsh-host-router: api')
 
-  ctx.on('dispose', () => {
-    unpatchFetch()
-  })
+  // cordis 4.0.2 不 emit 'dispose' 事件，清理必须走 effect disposer 才会在卸载时执行
+  ctx.effect(() => unpatchFetch, 'dsh-host-router: fetch cleanup')
 }
